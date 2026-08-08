@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0e1a">
+<title>BacheMap</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #131929;
+    --card: #1a2236;
+    --border: #1e2d45;
+    --accent: #f59e0b;
+    --danger: #ef4444;
+    --warning: #f97316;
+    --ok: #22c55e;
+    --info: #3b82f6;
+    --text: #f1f5f9;
+    --muted: #64748b;
+    --subtle: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; }
+
+  /* SCREENS */
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.25s, transform 0.25s; }
+  .screen.hidden { opacity: 0; pointer-events: none; transform: translateY(20px); }
+
+  /* HEADER */
+  .header { padding: 52px 20px 16px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo span { color: var(--accent); }
+  .badge { font-size: 10px; background: var(--accent); color: #000; padding: 2px 7px; border-radius: 99px; font-weight: 700; letter-spacing: 0.5px; margin-left: 4px; }
+
+  /* SCROLLABLE BODY */
+  .body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* CARDS */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+  .card-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+  /* STATS ROW */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 10px; text-align: center; }
+  .stat-val { font-size: 26px; font-weight: 800; line-height: 1; }
+  .stat-label { font-size: 10px; color: var(--muted); margin-top: 4px; font-weight: 500; letter-spacing: 0.5px; }
+  .danger { color: var(--danger); }
+  .warning { color: var(--warning); }
+  .ok { color: var(--ok); }
+
+  /* BUTTONS */
+  .btn { width: 100%; padding: 16px; border-radius: 14px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; letter-spacing: 0.3px; transition: transform 0.1s, opacity 0.1s; }
+  .btn:active { transform: scale(0.97); opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-ghost { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .btn-sm { padding: 10px 16px; font-size: 14px; border-radius: 10px; }
+
+  /* SENSOR BAR */
+  .sensor-bar-wrap { height: 8px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+  .sensor-bar { height: 100%; border-radius: 99px; transition: width 0.15s, background 0.15s; }
+
+  /* LIVE INDICATOR */
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s infinite; display: inline-block; margin-right: 6px; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+  /* DETECTION LIST */
+  .detection-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .detection-item:last-child { border-bottom: none; }
+  .det-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .det-icon.high { background: rgba(239,68,68,0.15); }
+  .det-icon.med { background: rgba(249,115,22,0.15); }
+  .det-icon.low { background: rgba(234,179,8,0.12); }
+  .det-info { flex: 1; }
+  .det-type { font-size: 13px; font-weight: 600; }
+  .det-coords { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: monospace; }
+  .det-mag { font-size: 12px; font-weight: 700; }
+
+  /* TRIP TIMER */
+  .timer { font-size: 48px; font-weight: 800; text-align: center; letter-spacing: -2px; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .timer-label { text-align: center; font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* ACTIVE SENSOR DISPLAY */
+  .accel-display { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+  .axis-box { background: var(--surface); border-radius: 10px; padding: 10px 6px; text-align: center; border: 1px solid var(--border); }
+  .axis-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; font-family: monospace; }
+  .axis-label { font-size: 10px; color: var(--muted); }
+
+  /* THRESHOLD SLIDER */
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  input[type=range] { flex: 1; -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 99px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+  .thresh-val { font-size: 14px; font-weight: 700; color: var(--accent); min-width: 36px; text-align: right; }
+
+  /* GPS STATUS */
+  .gps-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .gps-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .gps-dot.active { background: var(--ok); }
+  .gps-dot.waiting { background: var(--warning); }
+  .gps-dot.error { background: var(--danger); }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 24px 0; color: var(--muted); font-size: 14px; }
+  .empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+  /* SUMMARY SCREEN */
+  .summary-map { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); height: 200px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--muted); position: relative; overflow: hidden; }
+  .map-canvas { width: 100%; height: 100%; }
+  .export-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* ALERT TOAST */
+  .toast { position: fixed; top: 100px; left: 50%; transform: translateX(-50%) translateY(-20px); background: var(--danger); color: #fff; padding: 10px 20px; border-radius: 12px; font-weight: 700; font-size: 14px; opacity: 0; transition: all 0.3s; z-index: 999; white-space: nowrap; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* PERMISSION SCREEN */
+  .perm-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; text-align: center; gap: 16px; }
+  .perm-icon { font-size: 56px; }
+  .perm-title { font-size: 22px; font-weight: 800; }
+  .perm-desc { font-size: 14px; color: var(--subtle); line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== SCREEN: HOME ===== -->
+<div class="screen" id="screen-home">
+  <div class="header">
+    <div>
+      <div class="logo">Bache<span>Map</span> <span class="badge">BETA</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">Prototipo técnico</div>
+    </div>
+  </div>
+  <div class="body">
+
+    <!-- GPS STATUS -->
+    <div class="card">
+      <div class="card-title">Estado de sensores</div>
+      <div class="gps-row" id="gps-status-row">
+        <div class="gps-dot waiting" id="gps-dot"></div>
+        <span id="gps-status-text">Esperando GPS...</span>
+      </div>
+      <div style="margin-top:10px;" class="gps-row">
+        <div class="gps-dot waiting" id="accel-dot"></div>
+        <span id="accel-status-text">Acelerómetro: verificando...</span>
+      </div>
+    </div>
+
+    <!-- THRESHOLD CONFIG -->
+    <div class="card">
+      <div class="card-title">Sensibilidad de detección</div>
+      <div class="slider-row">
+        <span style="font-size:12px;color:var(--muted)">Baja</span>
+        <input type="range" id="threshold-slider" min="5" max="25" value="12" step="1">
+        <span style="font-size:12px;color:var(--muted)">Alta</span>
+        <span class="thresh-val" id="thresh-display">12</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Umbral actual: <b id="thresh-label">12 m/s²</b> — ajustá según el ruido del camino</div>
+    </div>
+
+    <!-- STATS PREVIAS -->
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px;">Sesiones anteriores</div>
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-val" id="total-sessions">0</div>
+          <div class="stat-label">Viajes</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val danger" id="total-detections">0</div>
+          <div class="stat-label">Detecciones</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val warning" id="total-high">0</div>
+          <div class="stat-label">Críticos</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- START BUTTON -->
+    <button class="btn btn-primary" id="btn-start" onclick="startTrip()">
+      🚗 &nbsp;Iniciar viaje
+    </button>
+
+    <!-- LAST SESSION -->
+    <div class="card" id="last-session-card" style="display:none">
+      <div class="card-title">Último viaje</div>
+      <div id="last-session-content"></div>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="viewSummary()">Ver resumen</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="exportCSV()">Exportar CSV</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== SCREEN: ACTIVE TRIP ===== -->
+<div class="screen hidden" id="screen-trip">
+  <div class="header" style="background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.3);">
+    <div class="live-dot"></div>
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:700;">Viaje en curso</div>
+    </div>
+    <button class="btn btn-danger btn-sm" style="width:auto;padding:8px 16px" onclick="stopTrip()">Detener</button>
+  </div>
+  <div class="body">
+
+    <!-- TIMER -->
+    <div class="card" style="text-align:center;padding:20px">
+      <div class="timer" id="trip-timer">00:00</div>
+      <div class="timer-label">Duración del viaje</div>
+    </div>
+
+    <!-- LIVE STATS -->
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-val danger" id="live-high">0</div>
+        <div class="stat-label">🔴 Críticos</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val warning" id="live-med">0</div>
+        <div class="stat-label">🟠 Moderados</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="color:var(--accent)" id="live-low">0</div>
+        <div class="stat-label">🟡 Leves</div>
+      </div>
+    </div>
+
+    <!-- ACCEL LIVE -->
+    <div class="card">
+      <div class="card-title">Acelerómetro en tiempo real</div>
+      <div class="accel-display">
+        <div class="axis-box">
+          <div class="axis-val" id="ax">0.0</div>
+          <div class="axis-label">Eje X</div>
+        </div>
+        <div class="axis-box">
+          <div class="axis-val" id="ay">0.0</div>
+          <div class="axis-label">Eje Y</div>
+        </div>
+        <div class="axis-box">
+          <div class="axis-val" id="az">0.0</div>
+          <div class="axis-label">Eje Z</div>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px;">
+          <span>Magnitud total</span>
+          <span id="mag-val">0.0 m/s²</span>
+        </div>
+        <div class="sensor-bar-wrap">
+          <div class="sensor-bar" id="mag-bar" style="width:0%;background:var(--ok)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GPS LIVE -->
+    <div class="card">
+      <div class="card-title">GPS</div>
+      <div class="gps-row">
+        <div class="gps-dot" id="live-gps-dot" style="background:var(--muted)"></div>
+        <span id="live-gps-text" style="font-size:12px;color:var(--muted);font-family:monospace">Adquiriendo señal...</span>
+      </div>
+      <div style="margin-top:6px;font-size:11px;color:var(--muted)" id="live-gps-accuracy"></div>
+    </div>
+
+    <!-- RECENT DETECTIONS -->
+    <div class="card">
+      <div class="card-title">Detecciones recientes</div>
+      <div id="live-detections">
+        <div class="empty">
+          <div class="empty-icon">🛣️</div>
+          <div>Sin detecciones aún<br>Empezá a manejar</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== SCREEN: SUMMARY ===== -->
+<div class="screen hidden" id="screen-summary">
+  <div class="header">
+    <div style="flex:1">
+      <div class="logo">Bache<span>Map</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">Resumen del viaje</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" style="width:auto" onclick="showScreen('screen-home')">← Inicio</button>
+  </div>
+  <div class="body">
+
+    <!-- MAP CANVAS -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      <canvas class="map-canvas" id="route-canvas" height="200"></canvas>
+    </div>
+
+    <!-- SUMMARY STATS -->
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-val" id="sum-total">0</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val danger" id="sum-high">0</div>
+        <div class="stat-label">🔴 Críticos</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val warning" id="sum-med">0</div>
+        <div class="stat-label">🟠 Moderados</div>
+      </div>
+    </div>
+
+    <!-- DETECTIONS LIST -->
+    <div class="card">
+      <div class="card-title">Todos los eventos detectados</div>
+      <div id="summary-list"></div>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="card">
+      <div class="card-title">Exportar datos</div>
+      <div class="export-row">
+        <button class="btn btn-primary btn-sm" onclick="exportCSV()">📊 CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportJSON()">📋 JSON</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">
+        CSV: compatible con Excel, Google Maps, QGIS<br>
+        JSON: para integración con backend o API
+      </div>
+    </div>
+
+    <!-- REPORT -->
+    <div class="card">
+      <div class="card-title">Reporte para municipalidad</div>
+      <button class="btn btn-ghost btn-sm" onclick="generateReport()">📄 Generar reporte TXT</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Formato estructurado listo para enviar a autoridades</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let state = {
+  screen: 'home',
+  trip: {
+    active: false,
+    startTime: null,
+    detections: [],
+    gps: { lat: null, lng: null, accuracy: null }
+  },
+  sessions: [],
+  threshold: 12,
+  sensors: {
+    gpsOk: false,
+    accelOk: false
+  }
+};
+
+let timerInterval = null;
+let accelHandler = null;
+let gpsWatcher = null;
+let lastDetectionTime = 0;
+const COOLDOWN_MS = 1200; // ms between detections
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  loadFromStorage();
+  updateHomeStats();
+  initThresholdSlider();
+  initGPS();
+  checkAccelerometer();
+});
+
+function loadFromStorage() {
+  try {
+    const s = localStorage.getItem('bachemap_sessions');
+    if (s) state.sessions = JSON.parse(s);
+    const th = localStorage.getItem('bachemap_threshold');
+    if (th) state.threshold = parseFloat(th);
+  } catch(e) {}
+}
+
+function saveToStorage() {
+  try {
+    localStorage.setItem('bachemap_sessions', JSON.stringify(state.sessions));
+    localStorage.setItem('bachemap_threshold', state.threshold);
+  } catch(e) {}
+}
+
+// ============================================================
+// SCREENS
+// ============================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  if (id === 'screen-summary') renderSummary();
+}
+
+// ============================================================
+// THRESHOLD SLIDER
+// ============================================================
+function initThresholdSlider() {
+  const slider = document.getElementById('threshold-slider');
+  slider.value = state.threshold;
+  updateThreshDisplay();
+  slider.addEventListener('input', () => {
+    state.threshold = parseFloat(slider.value);
+    updateThreshDisplay();
+    saveToStorage();
+  });
+}
+
+function updateThreshDisplay() {
+  document.getElementById('thresh-display').textContent = state.threshold;
+  document.getElementById('thresh-label').textContent = state.threshold + ' m/s²';
+}
+
+// ============================================================
+// GPS
+// ============================================================
+function initGPS() {
+  if (!navigator.geolocation) {
+    setGPSStatus(false, 'GPS no disponible en este dispositivo');
+    return;
+  }
+  gpsWatcher = navigator.geolocation.watchPosition(
+    pos => {
+      state.trip.gps = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      };
+      setGPSStatus(true, `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+      if (state.trip.active) updateLiveGPS(pos);
+    },
+    err => {
+      setGPSStatus(false, 'Error GPS: ' + err.message);
+    },
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+  );
+}
+
+function setGPSStatus(ok, msg) {
+  state.sensors.gpsOk = ok;
+  const dot = document.getElementById('gps-dot');
+  dot.className = 'gps-dot ' + (ok ? 'active' : 'error');
+  document.getElementById('gps-status-text').textContent = ok ? '📍 GPS activo — ' + msg : '⚠️ ' + msg;
+}
+
+function updateLiveGPS(pos) {
+  const dot = document.getElementById('live-gps-dot');
+  dot.style.background = 'var(--ok)';
+  document.getElementById('live-gps-text').textContent =
+    pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5);
+  document.getElementById('live-gps-accuracy').textContent =
+    'Precisión: ±' + Math.round(pos.coords.accuracy) + ' metros';
+}
+
+// ============================================================
+// ACCELEROMETER
+// ============================================================
+function checkAccelerometer() {
+  if (typeof DeviceMotionEvent === 'undefined') {
+    setAccelStatus(false);
+    return;
+  }
+  // iOS 13+ requires permission
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    document.getElementById('accel-status-text').textContent = 'Acelerómetro: requiere permiso (iOS)';
+    // Will request on trip start
+  } else {
+    setupAccelerometer();
+  }
+}
+
+function setupAccelerometer() {
+  window.addEventListener('devicemotion', handleMotion, { passive: true });
+  setTimeout(() => setAccelStatus(true), 500);
+}
+
+function setAccelStatus(ok) {
+  state.sensors.accelOk = ok;
+  const dot = document.getElementById('accel-dot');
+  dot.className = 'gps-dot ' + (ok ? 'active' : 'error');
+  document.getElementById('accel-status-text').textContent =
+    ok ? '📳 Acelerómetro activo' : '⚠️ Acelerómetro no disponible';
+}
+
+function handleMotion(event) {
+  if (!state.trip.active) return;
+  const acc = event.accelerationIncludingGravity;
+  if (!acc) return;
+
+  const x = acc.x || 0;
+  const y = acc.y || 0;
+  const z = acc.z || 0;
+  const magnitude = Math.sqrt(x*x + y*y + z*z);
+
+  // Update display
+  document.getElementById('ax').textContent = x.toFixed(1);
+  document.getElementById('ay').textContent = y.toFixed(1);
+  document.getElementById('az').textContent = z.toFixed(1);
+  document.getElementById('mag-val').textContent = magnitude.toFixed(1) + ' m/s²';
+
+  // Update bar
+  const pct = Math.min(100, (magnitude / 30) * 100);
+  const bar = document.getElementById('mag-bar');
+  bar.style.width = pct + '%';
+  if (magnitude > state.threshold * 1.5) bar.style.background = 'var(--danger)';
+  else if (magnitude > state.threshold) bar.style.background = 'var(--warning)';
+  else bar.style.background = 'var(--ok)';
+
+  // Detection logic
+  const now = Date.now();
+  if (magnitude > state.threshold && (now - lastDetectionTime) > COOLDOWN_MS) {
+    lastDetectionTime = now;
+    registerDetection(magnitude, x, y, z);
+  }
+}
+
+// ============================================================
+// TRIP CONTROL
+// ============================================================
+async function startTrip() {
+  // iOS permission request
+  if (typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const perm = await DeviceMotionEvent.requestPermission();
+      if (perm === 'granted') {
+        setupAccelerometer();
+      } else {
+        showToast('⚠️ Permiso de movimiento denegado');
+      }
+    } catch(e) {
+      showToast('Error de permiso: ' + e.message);
+    }
+  }
+
+  if (!navigator.geolocation && !state.sensors.accelOk) {
+    showToast('⚠️ Sensores no disponibles');
+  }
+
+  state.trip = {
+    active: true,
+    startTime: Date.now(),
+    detections: [],
+    gps: state.trip.gps
+  };
+
+  showScreen('screen-trip');
+  startTimer();
+  resetLiveStats();
+}
+
+function stopTrip() {
+  state.trip.active = false;
+  clearInterval(timerInterval);
+
+  if (state.trip.detections.length > 0 || true) {
+    const session = {
+      id: Date.now(),
+      startTime: state.trip.startTime,
+      endTime: Date.now(),
+      duration: Date.now() - state.trip.startTime,
+      detections: [...state.trip.detections]
+    };
+    state.sessions.push(session);
+    saveToStorage();
+    updateHomeStats();
+    showLastSession(session);
+  }
+
+  showScreen('screen-home');
+}
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    const elapsed = Date.now() - state.trip.startTime;
+    const mm = String(Math.floor(elapsed / 60000)).padStart(2, '0');
+    const ss = String(Math.floor((elapsed % 60000) / 1000)).padStart(2, '0');
+    document.getElementById('trip-timer').textContent = mm + ':' + ss;
+  }, 1000);
+}
+
+function resetLiveStats() {
+  document.getElementById('live-high').textContent = '0';
+  document.getElementById('live-med').textContent = '0';
+  document.getElementById('live-low').textContent = '0';
+  document.getElementById('live-detections').innerHTML =
+    '<div class="empty"><div class="empty-icon">🛣️</div><div>Sin detecciones aún<br>Empezá a manejar</div></div>';
+}
+
+// ============================================================
+// DETECTION
+// ============================================================
+function registerDetection(magnitude, x, y, z) {
+  let severity, type;
+  const ratio = magnitude / state.threshold;
+  if (ratio >= 2.0) { severity = 'high'; type = '🔴 Bache crítico'; }
+  else if (ratio >= 1.4) { severity = 'med'; type = '🟠 Bache moderado'; }
+  else { severity = 'low'; type = '🟡 Irregularidad leve'; }
+
+  const det = {
+    id: Date.now(),
+    timestamp: new Date().toISOString(),
+    magnitude: parseFloat(magnitude.toFixed(2)),
+    x: parseFloat(x.toFixed(2)),
+    y: parseFloat(y.toFixed(2)),
+    z: parseFloat(z.toFixed(2)),
+    severity,
+    type,
+    lat: state.trip.gps.lat,
+    lng: state.trip.gps.lng,
+    accuracy: state.trip.gps.accuracy
+  };
+
+  state.trip.detections.push(det);
+  updateLiveCounts();
+  prependDetectionItem(det);
+  showToast(type + ' — ' + magnitude.toFixed(1) + ' m/s²');
+}
+
+function updateLiveCounts() {
+  const dets = state.trip.detections;
+  document.getElementById('live-high').textContent = dets.filter(d => d.severity === 'high').length;
+  document.getElementById('live-med').textContent = dets.filter(d => d.severity === 'med').length;
+  document.getElementById('live-low').textContent = dets.filter(d => d.severity === 'low').length;
+}
+
+function prependDetectionItem(det) {
+  const container = document.getElementById('live-detections');
+  if (container.querySelector('.empty')) container.innerHTML = '';
+  const icon = det.severity === 'high' ? '🕳️' : det.severity === 'med' ? '⚡' : '〰️';
+  const coords = det.lat ? `${det.lat.toFixed(4)}, ${det.lng.toFixed(4)}` : 'GPS no disponible';
+  const html = `
+    <div class="detection-item" style="animation:fadeIn 0.3s">
+      <div class="det-icon ${det.severity}">${icon}</div>
+      <div class="det-info">
+        <div class="det-type">${det.type}</div>
+        <div class="det-coords">${coords}</div>
+      </div>
+      <div class="det-mag" style="color:${det.severity==='high'?'var(--danger)':det.severity==='med'?'var(--warning)':'var(--accent)'}">${det.magnitude} m/s²</div>
+    </div>`;
+  container.insertAdjacentHTML('afterbegin', html);
+  // Keep max 8 items visible
+  const items = container.querySelectorAll('.detection-item');
+  if (items.length > 8) items[items.length - 1].remove();
+}
+
+// ============================================================
+// HOME STATS
+// ============================================================
+function updateHomeStats() {
+  const sessions = state.sessions;
+  const allDets = sessions.flatMap(s => s.detections);
+  document.getElementById('total-sessions').textContent = sessions.length;
+  document.getElementById('total-detections').textContent = allDets.length;
+  document.getElementById('total-high').textContent = allDets.filter(d => d.severity === 'high').length;
+}
+
+function showLastSession(session) {
+  const card = document.getElementById('last-session-card');
+  const content = document.getElementById('last-session-content');
+  card.style.display = 'block';
+  const dur = Math.round(session.duration / 1000);
+  const mm = Math.floor(dur / 60);
+  const ss = dur % 60;
+  content.innerHTML = `
+    <div style="font-size:13px;color:var(--subtle)">
+      Duración: ${mm}m ${ss}s &nbsp;·&nbsp; ${session.detections.length} detecciones
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">
+      🔴 ${session.detections.filter(d=>d.severity==='high').length} críticos
+      &nbsp;🟠 ${session.detections.filter(d=>d.severity==='med').length} moderados
+      &nbsp;🟡 ${session.detections.filter(d=>d.severity==='low').length} leves
+    </div>`;
+}
+
+// ============================================================
+// SUMMARY
+// ============================================================
+function viewSummary() {
+  showScreen('screen-summary');
+}
+
+function renderSummary() {
+  const lastSession = state.sessions[state.sessions.length - 1];
+  if (!lastSession) return;
+  const dets = lastSession.detections;
+
+  // Stats
+  document.getElementById('sum-total').textContent = dets.length;
+  document.getElementById('sum-high').textContent = dets.filter(d => d.severity === 'high').length;
+  document.getElementById('sum-med').textContent = dets.filter(d => d.severity === 'med').length;
+
+  // Route canvas
+  renderRouteCanvas(dets);
+
+  // List
+  const list = document.getElementById('summary-list');
+  if (dets.length === 0) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><div>Sin detecciones en este viaje</div></div>';
+    return;
+  }
+  list.innerHTML = dets.map((d, i) => {
+    const icon = d.severity === 'high' ? '🕳️' : d.severity === 'med' ? '⚡' : '〰️';
+    const color = d.severity === 'high' ? 'var(--danger)' : d.severity === 'med' ? 'var(--warning)' : 'var(--accent)';
+    const coords = d.lat ? `${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}` : 'Sin GPS';
+    const time = new Date(d.timestamp).toLocaleTimeString('es-PY', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    return `<div class="detection-item">
+      <div class="det-icon ${d.severity}">${icon}</div>
+      <div class="det-info">
+        <div class="det-type">${d.type}</div>
+        <div class="det-coords">${coords} · ${time}</div>
+      </div>
+      <div class="det-mag" style="color:${color}">${d.magnitude} m/s²</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRouteCanvas(dets) {
+  const canvas = document.getElementById('route-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = 200;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const gpsPoints = dets.filter(d => d.lat && d.lng);
+  if (gpsPoints.length < 2) {
+    ctx.fillStyle = '#1a2236';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(gpsPoints.length === 0 ? 'Sin datos GPS en este viaje' : 'Pocos puntos GPS para trazar ruta', canvas.width / 2, 100);
+    return;
+  }
+
+  const lats = gpsPoints.map(p => p.lat);
+  const lngs = gpsPoints.map(p => p.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const pad = 20;
+
+  const toX = lng => pad + ((lng - minLng) / (maxLng - minLng || 1)) * (canvas.width - pad*2);
+  const toY = lat => pad + ((maxLat - lat) / (maxLat - minLat || 1)) * (canvas.height - pad*2);
+
+  ctx.fillStyle = '#131929';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Route line
+  ctx.beginPath();
+  ctx.strokeStyle = '#1e2d45';
+  ctx.lineWidth = 3;
+  ctx.moveTo(toX(gpsPoints[0].lng), toY(gpsPoints[0].lat));
+  gpsPoints.forEach(p => ctx.lineTo(toX(p.lng), toY(p.lat)));
+  ctx.stroke();
+
+  // Detection dots
+  gpsPoints.forEach(p => {
+    const color = p.severity === 'high' ? '#ef4444' : p.severity === 'med' ? '#f97316' : '#f59e0b';
+    const r = p.severity === 'high' ? 7 : p.severity === 'med' ? 5 : 3;
+    ctx.beginPath();
+    ctx.arc(toX(p.lng), toY(p.lat), r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(toX(p.lng), toY(p.lat), r + 3, 0, Math.PI * 2);
+    ctx.strokeStyle = color + '44';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+function getLastSession() {
+  return state.sessions[state.sessions.length - 1];
+}
+
+function exportCSV() {
+  const session = getLastSession();
+  if (!session || session.detections.length === 0) {
+    showToast('⚠️ Sin datos para exportar');
+    return;
+  }
+  const headers = ['timestamp','severity','type','magnitude_ms2','x','y','z','latitude','longitude','accuracy_m'];
+  const rows = session.detections.map(d => [
+    d.timestamp, d.severity, d.type.replace(/[🔴🟠🟡]/g, '').trim(),
+    d.magnitude, d.x, d.y, d.z,
+    d.lat || '', d.lng || '', d.accuracy || ''
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  downloadFile('bachemap_viaje.csv', csv, 'text/csv');
+  showToast('✅ CSV descargado');
+}
+
+function exportJSON() {
+  const session = getLastSession();
+  if (!session) { showToast('⚠️ Sin datos'); return; }
+  const json = JSON.stringify({
+    app: 'BacheMap',
+    version: '0.1-beta',
+    exported: new Date().toISOString(),
+    session: {
+      id: session.id,
+      start: new Date(session.startTime).toISOString(),
+      end: new Date(session.endTime).toISOString(),
+      duration_seconds: Math.round(session.duration / 1000),
+      threshold_used: state.threshold,
+      total_detections: session.detections.length,
+      detections: session.detections
+    }
+  }, null, 2);
+  downloadFile('bachemap_viaje.json', json, 'application/json');
+  showToast('✅ JSON descargado');
+}
+
+function generateReport() {
+  const session = getLastSession();
+  if (!session) { showToast('⚠️ Sin datos'); return; }
+  const dets = session.detections;
+  const high = dets.filter(d => d.severity === 'high');
+  const start = new Date(session.startTime);
+  const report = `REPORTE DE DETECCIÓN DE BACHES
+Generado por BacheMap v0.1 Beta
+=====================================
+Fecha: ${start.toLocaleDateString('es-PY')}
+Hora de inicio: ${start.toLocaleTimeString('es-PY')}
+Duración: ${Math.round(session.duration/60000)} min ${Math.round((session.duration%60000)/1000)} seg
+Umbral utilizado: ${state.threshold} m/s²
+
+RESUMEN
+-------
+Total de eventos: ${dets.length}
+Críticos (alta prioridad): ${high.length}
+Moderados: ${dets.filter(d=>d.severity==='med').length}
+Leves: ${dets.filter(d=>d.severity==='low').length}
+
+PUNTOS CRÍTICOS (requieren atención inmediata)
+----------------------------------------------
+${high.length === 0 ? 'Ninguno' : high.map((d,i) => `${i+1}. Magnitud: ${d.magnitude} m/s²
+   Coordenadas: ${d.lat ? d.lat.toFixed(5)+', '+d.lng.toFixed(5) : 'GPS no disponible'}
+   Hora: ${new Date(d.timestamp).toLocaleTimeString('es-PY')}`).join('\n\n')}
+
+=====================================
+Este reporte fue generado automáticamente
+por la aplicación BacheMap (Prototipo Técnico).
+`;
+  downloadFile('bachemap_reporte.txt', report, 'text/plain');
+  showToast('✅ Reporte generado');
+}
+
+function downloadFile(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = name;
+  a.click();
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ============================================================
+// STYLE ANIMATION
+// ============================================================
+const style = document.createElement('style');
+style.textContent = `@keyframes fadeIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }`;
+document.head.appendChild(style);
+</script>
+</body>
+</html>
